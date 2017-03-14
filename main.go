@@ -1,12 +1,15 @@
 package main
 
 import (
-	"convertfs/admutils"
-	"convertfs/mcio"
+	"flag"
 	"fmt"
 )
 
 func main() {
-	fmt.Println(fmt.Sprintf("%x", admutils.Hashfile("hash_is_6111c60d.txt")))
-	fmt.Println(fmt.Sprintf("%x", mcio.HashFileFirstColumn("full230.ind")))
+	// fmt.Println(fmt.Sprintf("%x", mcio.HashFileFirstColumn("full230.ind")))
+
+	var parFile string
+	flag.StringVar(&parFile, "p", "", "par file")
+	flag.Parse()
+	fmt.Println(parFile)
 }

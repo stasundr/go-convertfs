@@ -11,23 +11,23 @@ import (
 // HashFileFirstColumn takes a file path string as argument
 // and calculates hash for the file's first column (see *.snp or *.ind file)
 // File must have last empty line
-func HashFileFirstColumn(path string) int32 {
+func HashFileFirstColumn(path string) uint32 {
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-	var hash, thash int32
+	var hash, thash uint32
 	reader := bufio.NewReader(file)
-	firstColumnRegexp, _ := regexp.Compile(`\w+`)
+	firstColumnRegexp, _ := regexp.Compile(`\S+`)
 	for {
 		str, err := reader.ReadString(10)
 		if err != nil {
 			return hash
 		}
 
-		thash = admutils.Hashit(firstColumnRegexp.FindString(str))
+		thash = admutils.HashIt(firstColumnRegexp.FindString(str))
 		hash *= 17
 		hash ^= thash
 	}
