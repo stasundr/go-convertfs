@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	fmt.Println(admutils.Hashfile("test.txt"))
+	fmt.Println(admutils.Hashfile("hash_is_6111c60d.txt"))
 }

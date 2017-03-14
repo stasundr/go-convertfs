@@ -8,7 +8,7 @@ import (
 
 // Hashit takes a string as argument
 // and calculates hash for it
-// (see https://github.com/DReichLab/EIG/blob/master/src/admutils.c :683)
+// (see https://github.com/DReichLab/EIG/blob/master/src/admutils.c#L684)
 func Hashit(str string) int32 {
 	var hash, length int32 = 0, int32(len(str))
 
@@ -22,7 +22,7 @@ func Hashit(str string) int32 {
 
 // Hasharr takes an array of strings as argument
 // and calculates hash for it
-// (see https://github.com/DReichLab/EIG/blob/master/src/admutils.c :666)
+// (see https://github.com/DReichLab/EIG/blob/master/src/admutils.c#L667)
 func Hasharr(xarr []string) int32 {
 	var hash, thash, nxarr int32
 	nxarr = int32(len(xarr))
