@@ -3,7 +3,6 @@ package mcio
 import (
 	"bufio"
 	"convertfs/admutils"
-	"fmt"
 	"log"
 	"os"
 	"regexp"
@@ -35,10 +34,10 @@ func HashFileFirstColumn(path string) uint32 {
 	}
 }
 
-// Calcishash takes ...
+// Calcishash takes paths for *.geno, *.ind and *.snp files (eigenstrat combo)
 // and calculate hashes on individuals and SNPs (to compare with file values).
 // (see https://github.com/DReichLab/EIG/blob/master/src/mcio.c#L2697)
-func Calcishash(genoPath, indPath, snpPath string) {
+func Calcishash(genoPath, indPath, snpPath string) bool {
 	file, err := os.Open(genoPath)
 	if err != nil {
 		log.Fatal(err)
@@ -56,5 +55,6 @@ func Calcishash(genoPath, indPath, snpPath string) {
 	indRegexp, _ := regexp.Compile(indHash)
 	snpRegexp, _ := regexp.Compile(snpHash)
 	hashOk := indRegexp.MatchString(header) && snpRegexp.MatchString(header) && (indPath != snpPath)
-	fmt.Println("Hash OK: ", hashOk)
+
+	return hashOk
 }
