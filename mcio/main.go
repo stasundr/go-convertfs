@@ -3,9 +3,11 @@ package mcio
 import (
 	"bufio"
 	"convertfs/admutils"
+	"fmt"
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 )
 
 // HashFileFirstColumn takes a file path string as argument
@@ -36,64 +38,23 @@ func HashFileFirstColumn(path string) uint32 {
 // Calcishash takes ...
 // and calculate hashes on individuals and SNPs (to compare with file values).
 // (see https://github.com/DReichLab/EIG/blob/master/src/mcio.c#L2697)
-func Calcishash(snppath, indivpath string) {
-	// firstColumnRegexp, _ := regexp.Compile(`\w+`)
-	// fmt.Println(firstColumnRegexp.FindString("          rs12124819     1        0.020242          776546 A G"))
+func Calcishash(genoPath, indPath, snpPath string) {
+	file, err := os.Open(genoPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	ok := scanner.Scan()
+	if !ok {
+		log.Fatal("Can't read geno file")
+	}
+	header := scanner.Text()
+	indHash := strconv.FormatInt(int64(HashFileFirstColumn(indPath)), 16)
+	snpHash := strconv.FormatInt(int64(HashFileFirstColumn(snpPath)), 16)
+	indRegexp, _ := regexp.Compile(indHash)
+	snpRegexp, _ := regexp.Compile(snpHash)
+	hashOk := indRegexp.MatchString(header) && snpRegexp.MatchString(header) && (indPath != snpPath)
+	fmt.Println("Hash OK: ", hashOk)
 }
-
-/*!  \fn int calcishash(SNP **snpm, Indiv **indiv, int numsnps, int numind, int *pihash, int *pshash)
-\brief Calculate hashes on individuals and SNPs (to compare with file values.)
-\param snpm  Array of SNP data
-\param indiv Array if individual data
-\param numsnps  Number of elements in snpm
-\param numind  Number of elements in indiv
-\param pihash  Output parameter for indiv hash
-\param pshash  Output parameter for SNP hash
-Return number of SNPs plus number if individuals
-*/
-
-/*
-int
-calcishash (SNP **snpm, Indiv **indiv, int numsnps, int numind, int *pihash,
-            int *pshash)
-{
-  char **arrx;
-  int ihash, shash, n, num;
-  int i;
-  Indiv *indx;
-  SNP *cupt;
-
-  n = numind;
-  ZALLOC(arrx, n, char *);
-
-  num = 0;
-  for (i = 0; i < n; i++)
-    {
-      indx = indiv[i];
-      arrx[num] = strdup (indx->ID);
-      ++num;
-    }
-  *pihash = hasharr (arrx, num);
-
-  freeup (arrx, num);
-  free (arrx);
-
-  n = numsnps;
-  ZALLOC(arrx, n, char *);
-  num = 0;
-  for (i = 0; i < n; i++)
-    {
-      cupt = snpm[i];
-      if (cupt->isfake)
-        continue;
-      arrx[num] = strdup (cupt->ID);
-      cupt->ngtypes = numind;
-      ++num;
-    }
-  *pshash = hasharr (arrx, num);
-  freeup (arrx, num);
-  free (arrx);
-  return num;
-
-}
-*/
