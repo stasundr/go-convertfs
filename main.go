@@ -24,7 +24,9 @@ func main() {
 	// genoOutPath := "out.txt"
 
 	// packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath)
-	packedAncestryMapToBed()
+	// packedAncestryMapToBed()
+
+	fmt.Println(getIndNum("/Users/me/Desktop/v19/v19.0_HO.pruned.ind"))
 }
 
 func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath string) {
@@ -34,8 +36,7 @@ func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath strin
 	}
 
 	// TODO: copy *.ind and *.snp to indOutPath and snpOutPath
-	// TODO: get indNum
-	indNum := 435
+	indNum := getIndNum(indPath)
 
 	genoFile, err := os.Open(genoPath)
 	if err != nil {
@@ -45,7 +46,7 @@ func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath strin
 
 	genoOutFile, err := os.Create(genoOutPath)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer genoOutFile.Close()
 
@@ -107,6 +108,45 @@ func packedAncestryMapToBed() {
 	// Allele 2 (corresponding to set bits in .bed; usually major)
 	// Allele codes can contain more than one character. Variants with negative bp coordinates are ignored by PLINK.
 
-	magicNumbers := []byte{0x6c, 0x1b, 0x01}
-	fmt.Println(magicNumbers)
+	// bimOutFile, err := os.Create(bimOutPath)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer bimOutFile.Close()
+
+	// bimWriter := bufio.NewWriter(bimOutFile)
+	// for {
+	// 	str, err := reader.ReadString(10)
+	// 	if err != nil {
+	// 		return hash
+	// 	}
+	// }
+
+	// magicNumbers := []byte{0x6c, 0x1b, 0x01}
+	// fmt.Println(magicNumbers)
+}
+
+func getIndNum(indPath string) int {
+	var indNum int
+	indFile, err := os.Open(indPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer indFile.Close()
+
+	indScanner := bufio.NewScanner(indFile)
+	for indScanner.Scan() {
+		indNum++
+	}
+	if err := indScanner.Err(); err != nil {
+		log.Fatal("Can't read ind file")
+	}
+
+	return indNum
+}
+
+type snp struct {
+	id, chromosome, position string
+	allele1, allele2         byte
+	coordinate               int
 }
