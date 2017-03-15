@@ -18,11 +18,22 @@ func main() {
 	flag.Parse()
 	fmt.Println(parFile)
 
-	genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
-	indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
-	snpPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.snp"
-	genoOutPath := "out.txt"
+	// genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
+	// indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
+	// snpPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.snp"
+	// genoOutPath := "out.txt"
 
+	// packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath)
+	packedAncestryMapToBed()
+}
+
+func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath string) {
+	hashOk := mcio.Calcishash(genoPath, indPath, snpPath)
+	if !hashOk {
+		log.Fatal("Hash check is failed")
+	}
+
+	// TODO: copy *.ind and *.snp to indOutPath and snpOutPath
 	// TODO: get indNum
 	indNum := 435
 
@@ -45,9 +56,6 @@ func main() {
 
 	reader := bufio.NewReaderSize(genoFile, chunkSize)
 	writer := bufio.NewWriterSize(genoOutFile, indNum+1)
-
-	// packed eigenstrat to unpacked eigenstrat core
-	// for ideas see https://github.com/stasundr/co-huge-converter/blob/master/modules/utils.js
 
 	reader.Read(rchunk)
 	for {
@@ -79,7 +87,26 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+}
 
-	hashOk := mcio.Calcishash(genoPath, indPath, snpPath)
-	fmt.Println(hashOk, chunkSize)
+func packedAncestryMapToBed() {
+	// .bed
+	// see https://www.cog-genomics.org/plink2/formats#bed
+	// bed: magicNumbers + V blocks of math.Ceil(N/4) bytes each
+	// V - snp number
+	// N - ind number
+	// The first block corresponds to the first marker in the .bim file, etc.
+
+	// .bim
+	// one line per variant with the following six fields:
+	// Chromosome code (either an integer, or 'X'/'Y'/'XY'/'MT'; '0' indicates unknown) or name
+	// Variant identifier
+	// Position in morgans or centimorgans (safe to use dummy value of '0')
+	// Base-pair coordinate (normally 1-based, but 0 ok; limited to 231-2)
+	// Allele 1 (corresponding to clear bits in .bed; usually minor)
+	// Allele 2 (corresponding to set bits in .bed; usually major)
+	// Allele codes can contain more than one character. Variants with negative bp coordinates are ignored by PLINK.
+
+	magicNumbers := []byte{0x6c, 0x1b, 0x01}
+	fmt.Println(magicNumbers)
 }
