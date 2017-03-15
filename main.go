@@ -49,35 +49,35 @@ func main() {
 	// packed eigenstrat to unpacked eigenstrat core
 	// for ideas see https://github.com/stasundr/co-huge-converter/blob/master/modules/utils.js
 
-	// TODO: skip header!
+	reader.Read(rchunk)
 	for {
 		_, err := reader.Read(rchunk)
-		if err != nil {
+		if (err == nil) || (err == io.EOF) {
+			for i, b := range rchunk {
+				for j := uint(0); j < 4; j++ {
+					snp := (b >> (6 - j*2)) & 3
+					if k := i*4 + int(j); k < indNum {
+						switch snp {
+						case 0:
+							wchunk[k] = byte('0')
+						case 1:
+							wchunk[k] = byte('1')
+						case 2:
+							wchunk[k] = byte('2')
+						case 3:
+							wchunk[k] = byte('9')
+						}
+					}
+				}
+			}
+			writer.Write(wchunk)
+
 			if err == io.EOF {
 				break
 			}
+		} else {
+			log.Fatal(err)
 		}
-
-		for i, b := range rchunk {
-			for j := uint(0); j < 4; j++ {
-				snp := (b >> (6 - j*2)) & 3
-				if k := i*4 + int(j); k < indNum {
-					switch snp {
-					case 0:
-						wchunk[k] = byte('0')
-					case 1:
-						wchunk[k] = byte('1')
-					case 2:
-						wchunk[k] = byte('2')
-					case 3:
-						wchunk[k] = byte('9')
-					}
-
-				}
-			}
-		}
-
-		writer.Write(wchunk)
 	}
 
 	hashOk := mcio.Calcishash(genoPath, indPath, snpPath)
