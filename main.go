@@ -20,13 +20,15 @@ func main() {
 
 	// genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
 	// indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
-	// snpPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.snp"
+	snpPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.snp"
 	// genoOutPath := "out.txt"
 
 	// packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath)
 	// packedAncestryMapToBed()
 
-	fmt.Println(getIndNum("/Users/me/Desktop/v19/v19.0_HO.pruned.ind"))
+	snps := readSnps(snpPath)
+
+	fmt.Println(snps[100])
 }
 
 func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath string) {
@@ -36,7 +38,7 @@ func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath strin
 	}
 
 	// TODO: copy *.ind and *.snp to indOutPath and snpOutPath
-	indNum := getIndNum(indPath)
+	indNum := getRowsNumber(indPath)
 
 	genoFile, err := os.Open(genoPath)
 	if err != nil {
@@ -126,26 +128,51 @@ func packedAncestryMapToBed() {
 	// fmt.Println(magicNumbers)
 }
 
-func getIndNum(indPath string) int {
-	var indNum int
-	indFile, err := os.Open(indPath)
+func getRowsNumber(path string) int {
+	var num int
+	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer indFile.Close()
+	defer file.Close()
 
-	indScanner := bufio.NewScanner(indFile)
-	for indScanner.Scan() {
-		indNum++
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		num++
 	}
-	if err := indScanner.Err(); err != nil {
-		log.Fatal("Can't read ind file")
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
 	}
 
-	return indNum
+	return num
 }
 
-type snp struct {
+func readSnps(path string) []Snp {
+	size := getRowsNumber(path)
+	snps := make([]Snp, size)
+
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	i := 0
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		// TODO: correct snp metainfo parsing goes here
+		snps[i] = Snp{id: scanner.Text()}
+		i++
+	}
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	return snps
+}
+
+// Snp is a type for storing information about single nucleotide polymorphysm
+type Snp struct {
 	id, chromosome, position string
 	allele1, allele2         byte
 	coordinate               int
