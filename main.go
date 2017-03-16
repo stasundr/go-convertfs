@@ -9,6 +9,8 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func main() {
@@ -18,12 +20,14 @@ func main() {
 	flag.Parse()
 	fmt.Println(parFile)
 
-	// genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
-	// indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
+	genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
+	indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
 	snpPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.snp"
-	// genoOutPath := "out.txt"
+	genoOutPath := "out.geno"
+	indOutPath := "out.ind"
+	snpOutPath := "out.snp"
 
-	// packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath)
+	packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath)
 	// packedAncestryMapToBed()
 
 	snps := readSnps(snpPath)
@@ -31,13 +35,21 @@ func main() {
 	fmt.Println(snps[100])
 }
 
-func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath string) {
+func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath string) {
 	hashOk := mcio.Calcishash(genoPath, indPath, snpPath)
 	if !hashOk {
 		log.Fatal("Hash check is failed")
 	}
 
-	// TODO: copy *.ind and *.snp to indOutPath and snpOutPath
+	err := mcio.CopyFile(indPath, indOutPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = mcio.CopyFile(snpPath, snpOutPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	indNum := getRowsNumber(indPath)
 
 	genoFile, err := os.Open(genoPath)
@@ -147,6 +159,7 @@ func getRowsNumber(path string) int {
 	return num
 }
 
+// TODO: correct name for function? read eigenstrat snp?
 func readSnps(path string) []Snp {
 	size := getRowsNumber(path)
 	snps := make([]Snp, size)
@@ -160,8 +173,20 @@ func readSnps(path string) []Snp {
 	i := 0
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		// TODO: correct snp metainfo parsing goes here
-		snps[i] = Snp{id: scanner.Text()}
+		fields := strings.Fields(strings.Trim(scanner.Text(), " "))
+		coordinate, err := strconv.Atoi(fields[3])
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		snps[i] = Snp{
+			id:         fields[0],
+			chromosome: fields[1],
+			position:   fields[2],
+			coordinate: coordinate,
+			// TODO: Allele more precise parsing
+			allele1: fields[4][0],
+			allele2: fields[5][0]}
 		i++
 	}
 	if err := scanner.Err(); err != nil {
