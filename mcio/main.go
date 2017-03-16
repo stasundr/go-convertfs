@@ -121,13 +121,3 @@ func copyFileContents(src, dst string) (err error) {
 	err = out.Sync()
 	return
 }
-
-func main() {
-	fmt.Printf("Copying %s to %s\n", os.Args[1], os.Args[2])
-	err := CopyFile(os.Args[1], os.Args[2])
-	if err != nil {
-		fmt.Printf("CopyFile failed %q\n", err)
-	} else {
-		fmt.Printf("CopyFile succeeded\n")
-	}
-}
