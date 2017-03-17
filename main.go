@@ -21,19 +21,16 @@ func main() {
 	fmt.Println(parFile)
 
 	// genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
-	// indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
+	indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
 	snpPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.snp"
 	// genoOutPath := "out.geno"
 	// indOutPath := "out.ind"
 	// snpOutPath := "out.snp"
+	famOutPath := "out.fam"
 	bimOutPath := "out.bim"
 
 	// packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath)
-	packedAncestryMapToBed(snpPath, bimOutPath)
-
-	snps := readSnps(snpPath)
-
-	fmt.Println(snps[100])
+	packedAncestryMapToBed(indPath, snpPath, famOutPath, bimOutPath)
 }
 
 func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath string) {
@@ -105,43 +102,59 @@ func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indO
 	}
 }
 
-func packedAncestryMapToBed(snpPath, bimOutPath string) {
-	// .bed
-	// see https://www.cog-genomics.org/plink2/formats#bed
+func packedAncestryMapToBed(indPath, snpPath, famOutPath, bimOutPath string) {
+	// .bed (see https://www.cog-genomics.org/plink2/formats#bed)
 	// bed: magicNumbers + V blocks of math.Ceil(N/4) bytes each
 	// V - snp number
 	// N - ind number
 	// The first block corresponds to the first marker in the .bim file, etc.
 
-	// .bim
-	// one line per variant with the following six fields:
-	// Chromosome code (either an integer, or 'X'/'Y'/'XY'/'MT'; '0' indicates unknown) or name
-	// Variant identifier
-	// Position in morgans or centimorgans (safe to use dummy value of '0')
-	// Base-pair coordinate (normally 1-based, but 0 ok; limited to 231-2)
-	// Allele 1 (corresponding to clear bits in .bed; usually minor)
-	// Allele 2 (corresponding to set bits in .bed; usually major)
-	// Allele codes can contain more than one character. Variants with negative bp coordinates are ignored by PLINK.
+	// .fam (see https://www.cog-genomics.org/plink2/formats#fam)
+	// Family ID ('FID')
+	// Within-family ID ('IID'; cannot be '0')
+	// Within-family ID of father ('0' if father isn't in dataset)
+	// Within-family ID of mother ('0' if mother isn't in dataset)
+	// Sex code ('1' = male, '2' = female, '0' = unknown)
+	// Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control)
+	famOutFile, err := os.Create(famOutPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer famOutFile.Close()
 
+	inds := readEigenstratInd(indPath)
+	famWriter := bufio.NewWriter(famOutFile)
+	for i, ind := range inds {
+		// TODO: convert sex from "F/M/other" to 0/1/2
+		str := strconv.Itoa(i) + " " + ind.id + " 0 0 " + ind.sex + " 1" + string(10)
+		famWriter.WriteString(str)
+	}
+
+	if err = famWriter.Flush(); err != nil {
+		log.Fatal(err)
+	}
+
+	// .bim (see https://www.cog-genomics.org/plink2/formats#bim)
+	// Allele 1 (usually minor)
+	// Allele 2 (usually major)
+	// Allele codes can contain more than one character. Variants with negative bp coordinates are ignored by PLINK.
 	bimOutFile, err := os.Create(bimOutPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer bimOutFile.Close()
 
-	i := 0
-	snps := readSnps(snpPath)
+	snps := readEigenstratSnp(snpPath)
 	bimWriter := bufio.NewWriter(bimOutFile)
 	for _, snp := range snps {
-		i++
 		// TODO: ignore variants with negative bp coordinates
-		str := strconv.Itoa(i) + " " + snp.chromosome + " " + snp.id + " " + snp.position + " " + snp.coordinate + " " + snp.allele1 + " " + snp.allele2 + string(10)
+		str := snp.chromosome + " " + snp.id + " " + snp.position + " " + snp.coordinate + " " + snp.allele1 + " " + snp.allele2 + string(10)
 		bimWriter.WriteString(str)
-		// some kind of a bug here!
 	}
 
-	// magicNumbers := []byte{0x6c, 0x1b, 0x01}
-	fmt.Println(i, len(snps))
+	if err = bimWriter.Flush(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func getRowsNumber(path string) int {
@@ -163,8 +176,7 @@ func getRowsNumber(path string) int {
 	return num
 }
 
-// TODO: correct name for function? read eigenstrat snp?
-func readSnps(path string) []Snp {
+func readEigenstratSnp(path string) []Snp {
 	size := getRowsNumber(path)
 	snps := make([]Snp, size)
 
@@ -178,18 +190,14 @@ func readSnps(path string) []Snp {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		fields := strings.Fields(strings.Trim(scanner.Text(), " "))
-		// coordinate, err := strconv.Atoi(fields[3])
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
 
 		snps[i] = Snp{
 			id:         fields[0],
 			chromosome: fields[1],
 			position:   fields[2],
-			coordinate: fields[3], //coordinate,
-			allele1:    fields[4], //[0],
-			allele2:    fields[5]} //[0]}
+			coordinate: fields[3],
+			allele1:    fields[4],
+			allele2:    fields[5]}
 		i++
 	}
 	if err := scanner.Err(); err != nil {
@@ -199,9 +207,42 @@ func readSnps(path string) []Snp {
 	return snps
 }
 
+func readEigenstratInd(path string) []Individual {
+	size := getRowsNumber(path)
+	inds := make([]Individual, size)
+
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	i := 0
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		fields := strings.Fields(strings.Trim(scanner.Text(), " "))
+
+		inds[i] = Individual{
+			id:    fields[0],
+			sex:   fields[1],
+			label: fields[2]}
+		i++
+	}
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	return inds
+}
+
 // Snp is a type for storing information about single nucleotide polymorphysm
 type Snp struct {
 	id, chromosome, position, allele1, allele2, coordinate string
 	// allele1, allele2         byte
 	// coordinate               int
+}
+
+// Individual is a type for storing information about sample
+type Individual struct {
+	id, sex, label string
 }
