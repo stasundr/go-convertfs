@@ -20,17 +20,18 @@ func main() {
 	flag.Parse()
 	fmt.Println(parFile)
 
-	// genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
+	genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
 	indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
 	snpPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.snp"
 	// genoOutPath := "out.geno"
 	// indOutPath := "out.ind"
 	// snpOutPath := "out.snp"
-	famOutPath := "out.fam"
-	bimOutPath := "out.bim"
+	bedOutPath := "out2.bed"
+	famOutPath := "out2.fam"
+	bimOutPath := "out2.bim"
 
 	// packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath)
-	packedAncestryMapToBed(indPath, snpPath, famOutPath, bimOutPath)
+	packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, bimOutPath)
 }
 
 func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath string) {
@@ -102,20 +103,78 @@ func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indO
 	}
 }
 
-func packedAncestryMapToBed(indPath, snpPath, famOutPath, bimOutPath string) {
+func packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, bimOutPath string) {
 	// .bed (see https://www.cog-genomics.org/plink2/formats#bed)
 	// bed: magicNumbers + V blocks of math.Ceil(N/4) bytes each
 	// V - snp number
 	// N - ind number
 	// The first block corresponds to the first marker in the .bim file, etc.
+	// 0x6c, 0x1b, and 0x01
+
+	bedOutFile, err := os.Create(bedOutPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer bedOutFile.Close()
+
+	genoFile, err := os.Open(genoPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer genoFile.Close()
+
+	bedWriter := bufio.NewWriter(bedOutFile)
+	bedWriter.Write([]byte{0x6c, 0x1b, 0x01})
+
+	genoReader := bufio.NewReader(genoFile)
+	indNum := getRowsNumber(indPath)
+	chunkSize := int(math.Ceil(float64(indNum) / 4))
+	rchunk := make([]byte, chunkSize)
+	genoReader.Read(rchunk)
+
+	for {
+		genoByte, err := genoReader.ReadByte()
+		if err != nil {
+			break
+		}
+
+		// byte in eigenstrat *.geno is not the same as byte in plinks *.bed
+		// 00	Homozygous for first allele in .bim file
+		// 01	Missing genotype
+		// 10	Heterozygous
+		// 11	Homozygous for second allele in .bim file
+		// TODO: Treat bytes properly!
+		// geno -> bed
+		//   00 -> 00
+		//   01 -> 10
+		//   10 -> 11
+		//   11 -> 01
+		var bedByte, t byte
+		for i := uint(0); i < 4; i++ {
+			switch d := (genoByte >> i * 2) & 3; d {
+			case 0:
+				t = 0
+			case 1:
+				t = 2
+			case 2:
+				t = 3
+			case 3:
+				t = 1
+			}
+			bedByte = bedByte | (t << i * 2)
+		}
+
+		err = bedWriter.WriteByte(bedByte)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if err = bedWriter.Flush(); err != nil {
+		log.Fatal(err)
+	}
 
 	// .fam (see https://www.cog-genomics.org/plink2/formats#fam)
-	// Family ID ('FID')
-	// Within-family ID ('IID'; cannot be '0')
-	// Within-family ID of father ('0' if father isn't in dataset)
-	// Within-family ID of mother ('0' if mother isn't in dataset)
-	// Sex code ('1' = male, '2' = female, '0' = unknown)
-	// Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control)
 	famOutFile, err := os.Create(famOutPath)
 	if err != nil {
 		log.Fatal(err)
@@ -125,8 +184,16 @@ func packedAncestryMapToBed(indPath, snpPath, famOutPath, bimOutPath string) {
 	inds := readEigenstratInd(indPath)
 	famWriter := bufio.NewWriter(famOutFile)
 	for i, ind := range inds {
-		// TODO: convert sex from "F/M/other" to 0/1/2
-		str := strconv.Itoa(i) + " " + ind.id + " 0 0 " + ind.sex + " 1" + string(10)
+		var sex string
+		switch ind.sex {
+		case "M":
+			sex = "1"
+		case "F":
+			sex = "2"
+		default:
+			sex = "0"
+		}
+		str := strconv.Itoa(i) + " " + ind.id + " 0 0 " + sex + " 1" + string(10)
 		famWriter.WriteString(str)
 	}
 
