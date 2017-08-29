@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"convertfs/mcio"
+	"convertfs/utils"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"math"
@@ -14,24 +14,51 @@ import (
 )
 
 func main() {
-	// TODO: par file parse
-	var parFile string
-	flag.StringVar(&parFile, "p", "", "par file")
+	PACKEDPED := "PACKEDPED"
+	EIGENSTRAT := "EIGENSTRAT"
+
+	var formatOption string
+	flag.StringVar(&formatOption, "f", PACKEDPED, "")
+	flag.StringVar(&formatOption, "format", PACKEDPED, "")
+
+	var prefixOption string
+	flag.StringVar(&prefixOption, "p", "", "")
+	flag.StringVar(&prefixOption, "prefix", "", "")
+
+	var helpOption bool
+	flag.BoolVar(&helpOption, "h", false, "")
+	flag.BoolVar(&helpOption, "help", false, "")
+
+	setFlag(flag.CommandLine)
+
 	flag.Parse()
-	fmt.Println(parFile)
 
-	genoPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.geno"
-	indPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.ind"
-	snpPath := "/Users/me/Desktop/v19/v19.0_HO.pruned.snp"
-	// genoOutPath := "out.geno"
-	// indOutPath := "out.ind"
-	// snpOutPath := "out.snp"
-	bedOutPath := "out2.bed"
-	famOutPath := "out2.fam"
-	bimOutPath := "out2.bim"
+	if helpOption {
+		utils.ShowHelp()
+		return
+	}
 
-	// packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath)
-	packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, bimOutPath)
+	genoPath := prefixOption + ".geno"
+	indPath := prefixOption + ".ind"
+	snpPath := prefixOption + ".snp"
+	genoOutPath := prefixOption + ".unpacked.geno"
+	indOutPath := prefixOption + ".unpacked.ind"
+	snpOutPath := prefixOption + ".unpacked.snp"
+	bedOutPath := prefixOption + ".bed"
+	famOutPath := prefixOption + ".fam"
+	bimOutPath := prefixOption + ".bim"
+
+	if formatOption == PACKEDPED {
+		packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, bimOutPath)
+	} else if formatOption == EIGENSTRAT {
+		packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath)
+	}
+}
+
+func setFlag(flag *flag.FlagSet) {
+	flag.Usage = func() {
+		utils.ShowHelp()
+	}
 }
 
 func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath string) {
