@@ -285,9 +285,19 @@ func readEigenstratSnp(path string) []Snp {
 	for scanner.Scan() {
 		fields := strings.Fields(strings.Trim(scanner.Text(), " "))
 
+		rawChromosome := fields[1]
+		var chromosome string
+
+		switch rawChromosome {
+		case "90":
+			chromosome = "MT"
+		default:
+			chromosome = rawChromosome
+		}
+
 		snps[i] = Snp{
 			id:         fields[0],
-			chromosome: fields[1],
+			chromosome: chromosome,
 			position:   fields[2],
 			coordinate: fields[3],
 			allele1:    fields[4],
