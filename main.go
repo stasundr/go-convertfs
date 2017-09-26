@@ -13,21 +13,26 @@ import (
 	"strings"
 )
 
+var formatOption string
+var prefixOption string
+var helpOption bool
+var mtdnaChromosomeOption string
+
 func main() {
 	PACKEDPED := "PACKEDPED"
 	EIGENSTRAT := "EIGENSTRAT"
 
-	var formatOption string
 	flag.StringVar(&formatOption, "f", PACKEDPED, "")
 	flag.StringVar(&formatOption, "format", PACKEDPED, "")
 
-	var prefixOption string
 	flag.StringVar(&prefixOption, "p", "", "")
 	flag.StringVar(&prefixOption, "prefix", "", "")
 
-	var helpOption bool
 	flag.BoolVar(&helpOption, "h", false, "")
 	flag.BoolVar(&helpOption, "help", false, "")
+
+	flag.StringVar(&mtdnaChromosomeOption, "m", "25", "")
+	flag.StringVar(&mtdnaChromosomeOption, "mtdna", "25", "")
 
 	setFlag(flag.CommandLine)
 
@@ -156,45 +161,59 @@ func packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, 
 	genoReader := bufio.NewReader(genoFile)
 	indNum := getRowsNumber(indPath)
 	chunkSize := int(math.Ceil(float64(indNum) / 4))
-	rchunk := make([]byte, chunkSize)
+
+	// Why 48? See original EIG/src/mcio.c
+	genoChunkSize := chunkSize
+	if genoChunkSize < 48 {
+		genoChunkSize = 48
+	}
+
+	// Skip header
+	rchunk := make([]byte, genoChunkSize)
 	genoReader.Read(rchunk)
 
+	currentByteIndex := 0
 	for {
 		genoByte, err := genoReader.ReadByte()
 		if err != nil {
 			break
 		}
 
-		// byte in eigenstrat *.geno is not the same as byte in plinks *.bed
-		// 00	Homozygous for first allele in .bim file
-		// 01	Missing genotype
-		// 10	Heterozygous
-		// 11	Homozygous for second allele in .bim file
-		// TODO: Treat bytes properly!
-		// geno -> bed
-		//   00 -> 00
-		//   01 -> 10
-		//   10 -> 11
-		//   11 -> 01
-		var bedByte, t byte
-		for i := uint(0); i < 4; i++ {
-			switch d := (genoByte >> i * 2) & 3; d {
-			case 0:
-				t = 0
-			case 1:
-				t = 2
-			case 2:
-				t = 3
-			case 3:
-				t = 1
+		if currentByteIndex < chunkSize {
+			// byte in eigenstrat *.geno is not the same as byte in plinks *.bed
+			// 00	Homozygous for first allele in .bim file
+			// 01	Missing genotype
+			// 10	Heterozygous
+			// 11	Homozygous for second allele in .bim file
+
+			// TODO: !!! Treat bytes properly !!!
+			// geno -> bed
+			//   00 -> 00
+			//   01 -> 10
+			//   10 -> 11
+			//   11 -> 01
+			var bedByte, t byte
+			for i := uint(0); i < 4; i++ {
+				switch d := (genoByte >> i * 2) & 3; d {
+				case 0:
+					t = 0
+				case 1:
+					t = 2
+				case 2:
+					t = 3
+				case 3:
+					t = 1
+				}
+				bedByte = bedByte | (t << i * 2)
 			}
-			bedByte = bedByte | (t << i * 2)
+
+			err = bedWriter.WriteByte(bedByte)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
-		err = bedWriter.WriteByte(bedByte)
-		if err != nil {
-			log.Fatal(err)
-		}
+		currentByteIndex = (currentByteIndex + 1) % genoChunkSize
 	}
 
 	if err = bedWriter.Flush(); err != nil {
@@ -241,8 +260,10 @@ func packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, 
 	snps := readEigenstratSnp(snpPath)
 	bimWriter := bufio.NewWriter(bimOutFile)
 	for _, snp := range snps {
-		// TODO: ignore variants with negative bp coordinates
-		str := snp.chromosome + " " + snp.id + " " + snp.position + " " + snp.coordinate + " " + snp.allele1 + " " + snp.allele2 + string(10)
+		// TODO: ignore variants with negative position
+		//       for now just replacing minus with empty string
+		todoPosition := strings.Replace(snp.position, "-", "", -1)
+		str := snp.chromosome + " " + snp.id + " " + todoPosition + " " + snp.coordinate + " " + snp.allele1 + " " + snp.allele2 + string(10)
 		bimWriter.WriteString(str)
 	}
 
@@ -290,7 +311,7 @@ func readEigenstratSnp(path string) []Snp {
 
 		switch rawChromosome {
 		case "90":
-			chromosome = "MT"
+			chromosome = mtdnaChromosomeOption
 		default:
 			chromosome = rawChromosome
 		}
