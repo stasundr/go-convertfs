@@ -188,23 +188,24 @@ func packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, 
 
 			// TODO: !!! Treat bytes properly !!!
 			// geno -> bed
-			//   00 -> 00
+			//   00 -> 11
 			//   01 -> 10
-			//   10 -> 11
+			//   10 -> 00
 			//   11 -> 01
 			var bedByte, t byte
+
 			for i := uint(0); i < 4; i++ {
-				switch d := (genoByte >> i * 2) & 3; d {
+				switch d := (genoByte >> (i * 2)) & 3; d {
 				case 0:
-					t = 0
+					t = 3
 				case 1:
 					t = 2
 				case 2:
-					t = 3
+					t = 0
 				case 3:
 					t = 1
 				}
-				bedByte = bedByte | (t << i * 2)
+				bedByte = bedByte | (t << (6 - i*2))
 			}
 
 			err = bedWriter.WriteByte(bedByte)
@@ -310,6 +311,9 @@ func readEigenstratSnp(path string) []Snp {
 		var chromosome string
 
 		switch rawChromosome {
+		// TODO:
+		// X chromosome is encoded as 23.
+		// Also, Y is encoded as 24, mtDNA is encoded as 90, and XY is encoded as 91.
 		case "90":
 			chromosome = mtdnaChromosomeOption
 		default:
