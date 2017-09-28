@@ -5,6 +5,7 @@ import (
 	"convertfs/mcio"
 	"convertfs/utils"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"math"
@@ -21,6 +22,7 @@ var mtdnaChromosomeOption string
 func main() {
 	PACKEDPED := "PACKEDPED"
 	EIGENSTRAT := "EIGENSTRAT"
+	REDIS := "REDIS"
 
 	flag.StringVar(&formatOption, "f", PACKEDPED, "")
 	flag.StringVar(&formatOption, "format", PACKEDPED, "")
@@ -57,6 +59,8 @@ func main() {
 		packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, bimOutPath)
 	} else if formatOption == EIGENSTRAT {
 		packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indOutPath, snpOutPath)
+	} else if formatOption == REDIS {
+		packedAncestryMapToRedis(genoPath, indPath, snpPath)
 	}
 }
 
@@ -132,6 +136,65 @@ func packedAncestryMapToEigenstrat(genoPath, indPath, snpPath, genoOutPath, indO
 		} else {
 			log.Fatal(err)
 		}
+	}
+}
+
+func packedAncestryMapToRedis(genoPath, indPath, snpPath string) {
+	indNum := getRowsNumber(indPath)
+	currentByteIndex := 0
+
+	for i := 0; i < indNum; i++ {
+		genoFile, err := os.Open(genoPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer genoFile.Close()
+
+		genoReader := bufio.NewReader(genoFile)
+		chunkSize := int(math.Ceil(float64(indNum) / 4))
+
+		// Why 48? See original EIG/src/mcio.c
+		genoChunkSize := chunkSize
+		if genoChunkSize < 48 {
+			genoChunkSize = 48
+		}
+
+		// Skip header
+		rchunk := make([]byte, genoChunkSize)
+		genoReader.Read(rchunk)
+
+		var redisByte byte
+		var redisGeno string
+
+		byteOffset := int(math.Floor(float64(i) / 4))
+		bitOffset := uint8(i%4) * 2
+		var bitPosition uint8
+
+		for {
+			genoByte, err := genoReader.ReadByte()
+			if err != nil {
+				break
+			}
+
+			if currentByteIndex < chunkSize {
+				if currentByteIndex == byteOffset {
+					snp := (genoByte >> bitOffset) & 3
+					redisByte = redisByte | (snp << bitPosition)
+					bitPosition += 2
+
+					if bitPosition == 8 {
+						redisGeno += string(redisByte)
+						bitPosition = 0
+						redisByte = 0
+					}
+				}
+			}
+
+			currentByteIndex = (currentByteIndex + 1) % genoChunkSize
+		}
+
+		fmt.Println(i, redisGeno)
+		// TODO: write redisGeno to redis (+ hashes from ind & snp files)
 	}
 }
 
