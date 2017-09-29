@@ -225,6 +225,19 @@ func packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, 
 	indNum := getRowsNumber(indPath)
 	chunkSize := int(math.Ceil(float64(indNum) / 4))
 
+	lastOffset := uint8(indNum % 4)
+	var lastByteMask uint8
+	switch lastOffset {
+	case 0:
+		lastByteMask = 255
+	case 3:
+		lastByteMask = 191
+	case 2:
+		lastByteMask = 175
+	case 1:
+		lastByteMask = 171
+	}
+
 	// Why 48? See original EIG/src/mcio.c
 	genoChunkSize := chunkSize
 	if genoChunkSize < 48 {
@@ -269,6 +282,10 @@ func packedAncestryMapToBed(genoPath, indPath, snpPath, bedOutPath, famOutPath, 
 					t = 1
 				}
 				bedByte = bedByte | (t << (6 - i*2))
+			}
+
+			if currentByteIndex == chunkSize-1 {
+				bedByte = bedByte & lastByteMask
 			}
 
 			err = bedWriter.WriteByte(bedByte)
